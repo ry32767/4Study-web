@@ -1,0 +1,24 @@
+{
+  "name": "four-study-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build --base=./",
+    "preview": "vite preview --host 127.0.0.1",
+    "test": "node --test tests/*.test.js",
+    "test:ui": "playwright test",
+    "check": "prettier --check src tests index.html playwright.config.js vite.config.js package.json",
+    "format": "prettier --write src tests index.html playwright.config.js vite.config.js package.json"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "@playwright/test": "^1.56.0",
+    "prettier": "^3.9.10",
+    "vite": "^6.0.0"
+  }
+}
