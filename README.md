@@ -25,7 +25,7 @@ GitHub Actions Variablesの `VITE_SUPABASE_URL` と `VITE_SUPABASE_PUBLISHABLE_K
 `blanks`（`{id,before,answer,after}` の配列）、`source_question`（原問題番号）、
 `original_result`（`correct`/`incorrect`/`partial`/`ungraded`/`unknown`）。
 正解した原問題も再出題でき、教科・単元・元の結果で絞り込めます。旧JSONは引き続き使用できます。
-旧DBには追加で `202610250002_practice_memory.sql` を適用してください。既存行は保持します。
+旧DBには追加で `202610250002_practice_memory.sql`、`202610250003_recall_permissions.sql` を順に適用してください。既存行は保持します。
 
 「設定とデータ」から問題JSONとテスト記録JSONを取り込めます。内容と保存先の確認後に登録します。
 テスト記録は `{ "schema_version": 1, "test_results": [...] }`。受験日不明は `taken_on: null` とし、全期間だけに集計します。
