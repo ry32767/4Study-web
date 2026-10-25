@@ -31,6 +31,7 @@ export class Store {
       activities: [],
       daily_sets: [],
       test_results: [],
+      recall_events: [],
     };
   }
   get demo() {
@@ -60,6 +61,7 @@ export class Store {
         test_results: [],
       });
       this.data.test_results ??= [];
+      this.data.recall_events ??= [];
       return;
     }
     // No cloud data cache: a signed-out/shared browser must not display previous user's data.
@@ -69,6 +71,7 @@ export class Store {
       "activities",
       "daily_sets",
       "test_results",
+      "recall_events",
     ];
     const rows = await Promise.all(
       tables.map(async (table) => {

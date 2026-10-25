@@ -42,7 +42,20 @@ test("migration, RLS, immutable versions, corrections, idempotency and daily RPC
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        new URL(
+          "../../supabase/migrations/202610250002_practice_memory.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
     await db.exec("set role anon");
+    await assert.rejects(
+      db.query("select * from public.recall_events"),
+      /permission denied/,
+    );
     await assert.rejects(
       db.query("select * from public.questions"),
       /permission denied/,
@@ -55,6 +68,10 @@ test("migration, RLS, immutable versions, corrections, idempotency and daily RPC
       `reset role; set role authenticated; set request.jwt.claim.sub = '${first}'`,
     );
     const normalized = validateQuestions(samples);
+    // Old JSON without the additional fields can still be imported after this migration.
+    await db.query("select public.import_questions($1::jsonb)", [
+      JSON.stringify([samples[0]]),
+    ]);
     await db.query("select public.import_questions($1::jsonb)", [
       JSON.stringify(normalized),
     ]);
@@ -64,6 +81,56 @@ test("migration, RLS, immutable versions, corrections, idempotency and daily RPC
     assert.equal(
       (await db.query("select * from public.questions")).rows.length,
       samples.length,
+    );
+    const recallInsert = `insert into public.recall_events(user_id,id,question_id,question_version,blank_id,occurred_at,result) values($1,$2,$3,1,$4,now(),$5) on conflict(user_id,id) do nothing`;
+    const recallId = "12345678-1234-4234-8234-123456789abc";
+    await db.query(recallInsert, [
+      first,
+      recallId,
+      samples[4].id,
+      "relative",
+      "wrong",
+    ]);
+    await db.query(recallInsert, [
+      first,
+      recallId,
+      samples[4].id,
+      "relative",
+      "wrong",
+    ]);
+    assert.equal(
+      (await db.query("select * from public.recall_events")).rows.length,
+      1,
+    );
+    await assert.rejects(
+      db.query(recallInsert, [
+        first,
+        "12345678-1234-4234-8234-123456789abd",
+        samples[4].id,
+        "missing",
+        "wrong",
+      ]),
+      /Unknown blank/,
+    );
+    await assert.rejects(
+      db.query("update public.recall_events set result='known'"),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.query("delete from public.recall_events"),
+      /permission denied/,
+    );
+    await assert.rejects(
+      db.query("select public.import_questions($1::jsonb)", [
+        JSON.stringify([
+          {
+            ...normalized[0],
+            id: "invalid-choices",
+            choices: ["a", "a", "b", "c"],
+          },
+        ]),
+      ]),
+      /unique/,
     );
     await assert.rejects(
       db.query("select public.import_questions($1::jsonb)", [
@@ -147,6 +214,19 @@ test("migration, RLS, immutable versions, corrections, idempotency and daily RPC
       ]),
     );
     await db.exec(`set request.jwt.claim.sub = '${second}'`);
+    assert.equal(
+      (await db.query("select * from public.recall_events")).rows.length,
+      0,
+    );
+    await assert.rejects(
+      db.query(recallInsert, [
+        first,
+        "12345678-1234-4234-8234-123456789abe",
+        samples[4].id,
+        "relative",
+        "wrong",
+      ]),
+    );
     assert.equal(
       (await db.query("select * from public.questions")).rows.length,
       0,

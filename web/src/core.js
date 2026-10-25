@@ -180,6 +180,45 @@ export function validateQuestions(input) {
       throw new Error("出典ページが不正です。");
     if (ids.has(keyOf(q))) throw new Error("同じ問題・版が重複しています。");
     ids.add(keyOf(q));
+    const choices = q.choices ?? [];
+    const blanks = q.blanks ?? [];
+    const original_result = q.original_result ?? "unknown";
+    const source_question = q.source_question ?? "";
+    if (
+      !Array.isArray(choices) ||
+      ![0, 4].includes(choices.length) ||
+      choices.some(
+        (v) => typeof v !== "string" || !v.trim() || v.length > 20000,
+      ) ||
+      new Set(choices).size !== choices.length ||
+      (choices.length && !choices.includes(q.answer))
+    )
+      throw new Error(
+        "4択には重複しない4つの選択肢と、そのいずれかに一致する解答が必要です。",
+      );
+    if (
+      !["correct", "incorrect", "partial", "ungraded", "unknown"].includes(
+        original_result,
+      ) ||
+      typeof source_question !== "string" ||
+      source_question.length > 100
+    )
+      throw new Error("元テストの正誤・問題番号が不正です。");
+    if (
+      !Array.isArray(blanks) ||
+      blanks.length > 100 ||
+      blanks.some(
+        (b) =>
+          !b ||
+          !/^[\w-]{1,100}$/.test(b.id) ||
+          ["before", "answer", "after"].some(
+            (f) => typeof b[f] !== "string" || b[f].length > 20000,
+          ) ||
+          !b.answer.trim(),
+      ) ||
+      new Set(blanks.map((b) => b.id)).size !== blanks.length
+    )
+      throw new Error("穴埋めには一意の箇所ID・前後の文・答えが必要です。");
     return Object.fromEntries(
       [
         ...fields,
@@ -190,7 +229,21 @@ export function validateQuestions(input) {
         "status",
         "parent_id",
         "source_page",
-      ].map((f) => [f, q[f] ?? null]),
+      ]
+        .map((f) => [f, q[f] ?? null])
+        .concat(
+          Object.entries({
+            choices,
+            blanks: blanks.map(({ id, before, answer, after }) => ({
+              id,
+              before,
+              answer,
+              after,
+            })),
+            original_result,
+            source_question,
+          }),
+        ),
     );
   });
 }

@@ -60,6 +60,26 @@ export const samples = [
     prompt:
       "空欄に適切な関係代名詞を入れよう。\nThis is the book (     ) I bought yesterday.",
     answer: "which または that（省略も可能）",
+    choices: [
+      "which または that（省略も可能）",
+      "who のみ",
+      "where のみ",
+      "when のみ",
+    ],
+    blanks: [
+      {
+        id: "relative",
+        before: "This is the book (",
+        answer: "which / that / 省略",
+        after: ") I bought yesterday.",
+      },
+      {
+        id: "role",
+        before: "関係節の bought の",
+        answer: "目的語",
+        after: "が欠けています。",
+      },
+    ],
     explanation:
       "先行詞は物を表すbookで、関係節のboughtの目的語が欠けています。目的格のwhich / thatを使い、省略もできます。",
   },
