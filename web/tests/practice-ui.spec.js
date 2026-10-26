@@ -65,6 +65,7 @@ for (const width of [1440, 390]) {
     await flip.focus();
     await page.keyboard.press("Enter");
     await expect(card.locator(".revealed-answer").first()).toBeVisible();
+    await expect(flip).toHaveAttribute("aria-label", /答え：.*押すと隠す/);
     await card.getByRole("button", { name: "間違えた ＋1" }).first().click();
     await expect(card.locator(".recall-count").first()).toHaveText(
       "間違えた回数：1回",

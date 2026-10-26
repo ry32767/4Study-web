@@ -566,7 +566,12 @@ document.addEventListener("click", async (event) => {
       const line = button.closest(".recall-line");
       const revealed = button.getAttribute("aria-expanded") !== "true";
       button.setAttribute("aria-expanded", String(revealed));
-      button.setAttribute("aria-label", revealed ? "答えを隠す" : "答えを表示");
+      button.setAttribute(
+        "aria-label",
+        revealed
+          ? `答え：${line.querySelector(".revealed-answer").textContent}。押すと隠す`
+          : "答えを表示",
+      );
       button.querySelector(".sticky-cover").hidden = revealed;
       line.querySelector(".revealed-answer").hidden = !revealed;
       for (const mark of line.querySelectorAll(".actions button")) {
@@ -709,6 +714,7 @@ document.addEventListener("change", async (event) => {
     if (el.id === "memory-sheet") state.memorySheet = el.value;
     if (el.id === "exact-only") state.exactOnly = el.checked;
     await render();
+    document.getElementById(el.id)?.focus();
     return;
   }
   if (el.id === "only-marked") {
