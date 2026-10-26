@@ -62,6 +62,15 @@ test("migration, RLS, immutable versions, corrections, idempotency and daily RPC
         "utf8",
       ),
     );
+    await db.exec(
+      await readFile(
+        new URL(
+          "../../supabase/migrations/202610260001_source_fidelity.sql",
+          import.meta.url,
+        ),
+        "utf8",
+      ),
+    );
     await db.exec("set role anon");
     await assert.rejects(
       db.query("select * from public.recall_events"),

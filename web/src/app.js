@@ -1,3 +1,4 @@
+import { authoringBrief } from "./authoring.js";
 import { prepareTests } from "./test-import.js";
 import "./style.css";
 import { Store, client } from "./store.js";
@@ -55,6 +56,10 @@ const state = {
   practice: null,
   originalResult: "",
   onlyMarked: false,
+  memorySheet: "",
+  source: "",
+  exactOnly: false,
+  practiceDrafts: new Map(),
   generation: 0,
 };
 const titles = {
@@ -130,7 +135,7 @@ function doneToday(q) {
 }
 function row(q, reason = "") {
   const done = doneToday(q);
-  return `<article class="question-row"><div><span class="badge">${esc(schoolGroup(q.subject, q.course) || q.subject)}</span> <small>${esc(q.course)} / ${esc(q.unit)}</small><h3>${esc(q.prompt.length > 60 ? q.prompt.slice(0, 60) + "…" : q.prompt)}</h3><p class="meta">${q.kind === "variant" ? "類題" : "復習"} ・ ${q.minutes}分${reason ? ` ・ ${esc(reason)}` : ""}<br>${esc(originalLabels[q.original_result ?? "unknown"])} ・ 演習の誤答 ${practiceMistakes(state.store.data.attempts, q)}回 ・ 暗記の印 ${mistakeCount(state.store.data.recall_events, q)}回</p></div><div class="actions"><button ${done ? "" : 'class="primary"'} data-action="solve" data-key="${esc(keyOf(q))}">${done ? "もう一度" : "解く"}</button><button data-action="memorize" data-key="${esc(keyOf(q))}">覚える</button></div></article>`;
+  return `<article class="question-row"><div><span class="badge">${esc(schoolGroup(q.subject, q.course) || q.subject)}</span> <small>${esc(q.course)} / ${esc(q.unit)}</small><h3>${esc(q.prompt.length > 60 ? q.prompt.slice(0, 60) + "…" : q.prompt)}</h3><p class="meta">${q.kind === "variant" ? "類題" : "復習"} ・ ${q.minutes}分${reason ? ` ・ ${esc(reason)}` : ""}<br>${q.source_fidelity === "exact" ? "原文照合済み" : q.source_fidelity === "adapted" ? "復習用に編集" : "原文一致は未確認"} ・ ${esc(originalLabels[q.original_result ?? "unknown"])} ・ 演習の誤答 ${practiceMistakes(state.store.data.attempts, q)}回 ・ 暗記の印 ${mistakeCount(state.store.data.recall_events, q)}回</p></div><div class="actions"><button ${done ? "" : 'class="primary"'} data-action="solve" data-key="${esc(keyOf(q))}">${done ? "もう一度" : "解く"}</button><button data-action="memorize" data-key="${esc(keyOf(q))}">覚える</button></div></article>`;
 }
 function chart(groups) {
   if (groups.length < 3)
@@ -201,18 +206,37 @@ function exerciseFilters() {
         .map((q) => q.unit),
     ),
   ];
-  return `<div class="filters">${subjectFilter()}<label>単元<select id="unit">${options(units, state.unit, "すべての単元")}</select></label>${kindFilter()}<label>元テストの結果<select id="original-result"><option value="">正解・誤答をすべて表示</option>${Object.entries(
+  const sources = [
+    ...new Map(
+      state.store.data.questions
+        .filter(
+          (q) =>
+            !state.subject ||
+            schoolGroup(q.subject, q.course) === state.subject,
+        )
+        .map((q) => [q.source_id, q.source_label]),
+    ).entries(),
+  ];
+  return `<div class="filters"><label>教材・元テスト<select id="source"><option value="">すべての教材</option>${sources.map(([id, label]) => `<option value="${esc(id)}" ${state.source === id ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>${subjectFilter()}<label>単元<select id="unit">${options(units, state.unit, "すべての単元")}</select></label>${kindFilter()}<label>元テストの結果<select id="original-result"><option value="">正解・誤答をすべて表示</option>${Object.entries(
     originalLabels,
   )
     .map(
       ([k, v]) =>
         `<option value="${k}" ${state.originalResult === k ? "selected" : ""}>${v}</option>`,
     )
-    .join("")}</select></label></div>`;
+    .join(
+      "",
+    )}</select></label><label class="check"><input type="checkbox" id="exact-only" ${state.exactOnly ? "checked" : ""}>原文照合済みの元テスト問題のみ</label></div>`;
 }
 function exercises() {
   const qs = questionList(state.store.data, state);
-  return `${head("教科別の演習", "正解した問題も、間違えた問題も。教科と単元を選んで何度でも解き直せます。")}${exerciseFilters()}<section class="panel"><div class="section-title"><h2>${esc(state.subject || "すべての教科")}</h2><small>${qs.length}問</small></div>${qs.map((q) => row(q, dueFor(q, state.store.data.attempts).reason)).join("") || '<p class="empty">確認済みの問題がありません。設定から問題JSONを取り込めます。</p>'}</section>`;
+  const pending = state.store.data.questions.filter(
+    (q) =>
+      q.status !== "verified" &&
+      (!state.source || q.source_id === state.source) &&
+      (!state.subject || schoolGroup(q.subject, q.course) === state.subject),
+  );
+  return `${head("教科別の演習", "正解した問題も、間違えた問題も。教科と単元を選んで何度でも解き直せます。")}${exerciseFilters()}<p class="muted">登録済み ${qs.length}問・要確認 ${pending.length}件。全問収録は原本の小問一覧との照合が必要です。</p>${qs.length ? `<button class="primary" data-action="solve" data-key="${esc(keyOf(qs[0]))}">このセットを解く</button>` : ""}<section class="panel"><div class="section-title"><h2>${esc(state.subject || "すべての教科")}</h2><small>${qs.length}問</small></div>${qs.map((q) => row(q, dueFor(q, state.store.data.attempts).reason)).join("") || '<p class="empty">確認済みの問題がありません。設定から問題JSONを取り込めます。</p>'}</section>`;
 }
 function memory() {
   return memoryView(state.store.data, state, {
@@ -300,7 +324,7 @@ function history() {
   }</section>`;
 }
 function settings() {
-  return `${head("設定とデータ", "学習の記録を手元に残し、問題を少しずつ追加しましょう。")}<div class="grid"><section class="panel"><h2>問題を追加する</h2><p class="muted">確認済みの問題JSONを選び、内容を確認して取り込みます。既存の問題を直すときは版を増やしてください。</p><div class="callout">${state.store.demo ? "サンプルモードではこのブラウザだけに保存します。" : "取り込みを実行すると、選んだ問題文・解答・出典IDをSupabaseの本人用領域へ送信します。"}学校原本や氏名を含む本文は選ばず、確認済みの生成教材を使ってください。</div><label>問題JSON<input class="file-input" id="question-file" type="file" accept="application/json,.json"></label><div id="import-preview"></div><div class="actions"><button data-action="sample-json">サンプルJSONを書き出す</button></div></section><div><section class="panel"><h2>テスト記録を追加する</h2><p>確認済み成績のJSONを読み込みます。受験日不明は空欄のまま保存し、分析では「全期間」のみに含めます。</p><label>テスト記録JSON<input id="test-record-file" type="file" accept="application/json,.json"></label><div id="test-import-preview"></div></section><section class="panel"><h2>学習データの保存</h2><p class="muted">問題・解答・学習活動・日次プランをJSONで書き出せます。Vaultへの取り込みにはPythonの import-study コマンドを使います。</p><button class="primary" data-action="export">全記録を書き出す</button><p class="chart-legend" style="margin-top:16px">未同期の記録も含みます。ファイルは個人用の場所に保管してください。書き出しだけでは独立バックアップの検証完了になりません。</p></section><section class="panel"><h2>一日の目安時間</h2><form id="budget-form"><label>目標（分）<input name="budget" type="number" min="1" max="120" value="${state.budget}" required></label><button type="submit" style="margin-top:12px">保存</button></form><p class="chart-legend" style="margin-top:12px">今日のプランは固定です。変更は次の日の作成に使われます。この端末で保持します。</p></section></div></div>`;
+  return `${head("設定とデータ", "学習の記録を手元に残し、問題を少しずつ追加しましょう。")}<div class="grid"><section class="panel"><h2>問題を追加する</h2><details><summary>Luna等で問題を作る</summary><p>利用するチャットでモデルを選び、この依頼文と対象資料を指定してください。作成後は原本・解答を照合してJSONを取り込みます。</p><label>問題作成の依頼文<textarea readonly rows="10">${esc(authoringBrief)}</textarea></label><button data-action="authoring-brief">依頼文を保存</button></details><p class="muted">確認済みの問題JSONを選び、内容を確認して取り込みます。既存の問題を直すときは版を増やしてください。</p><div class="callout">${state.store.demo ? "サンプルモードではこのブラウザだけに保存します。" : "取り込みを実行すると、選んだ問題文・解答・出典IDをSupabaseの本人用領域へ送信します。"}原本ファイルや氏名などの個人情報は含めず、照合済みの問題・解答を使ってください。</div><label>問題JSON<input class="file-input" id="question-file" type="file" accept="application/json,.json"></label><div id="import-preview"></div><div class="actions"><button data-action="sample-json">サンプルJSONを書き出す</button></div></section><div><section class="panel"><h2>テスト記録を追加する</h2><p>確認済み成績のJSONを読み込みます。受験日不明は空欄のまま保存し、分析では「全期間」のみに含めます。</p><label>テスト記録JSON<input id="test-record-file" type="file" accept="application/json,.json"></label><div id="test-import-preview"></div></section><section class="panel"><h2>学習データの保存</h2><p class="muted">問題・解答・学習活動・日次プランをJSONで書き出せます。Vaultへの取り込みにはPythonの import-study コマンドを使います。</p><button class="primary" data-action="export">全記録を書き出す</button><p class="chart-legend" style="margin-top:16px">未同期の記録も含みます。ファイルは個人用の場所に保管してください。書き出しだけでは独立バックアップの検証完了になりません。</p></section><section class="panel"><h2>一日の目安時間</h2><form id="budget-form"><label>目標（分）<input name="budget" type="number" min="1" max="120" value="${state.budget}" required></label><button type="submit" style="margin-top:12px">保存</button></form><p class="chart-legend" style="margin-top:12px">今日のプランは固定です。変更は次の日の作成に使われます。この端末で保持します。</p></section></div></div>`;
 }
 async function render(focus = false) {
   if (!state.store) return login();
@@ -342,15 +366,34 @@ function modal(html) {
 function gradeFields(q, old = null) {
   return `<div class="two"><label>獲得点 / ${q.max_points}点<input name="score" type="number" min="0" max="${q.max_points}" step="any" value="${old?.score ?? ""}" placeholder="空欄なら未採点"></label><label>採点方法<select name="grading"><option value="self" ${old?.grading === "self" ? "selected" : ""}>自己採点</option><option value="school" ${old?.grading === "school" ? "selected" : ""}>学校採点</option></select></label></div><label>解くときの自信<select name="confidence"><option value="unknown">未回答</option><option value="sure" ${old?.confidence === "sure" ? "selected" : ""}>自信あり</option><option value="unsure" ${old?.confidence === "unsure" ? "selected" : ""}>不安がある</option></select></label><label class="check"><input type="checkbox" name="hint" ${old?.hint ? "checked" : ""}>解答前にヒントを使った</label>`;
 }
-function solve(key, old = null) {
+async function solve(key, old = null) {
   const q = state.store.data.questions.find(
     (q) => keyOf(q) === key && q.status === "verified",
   );
   if (!q) throw new Error("確認済みの問題が見つかりません。");
   if (!old) {
-    const from = state.tab === "practice" ? state.practice.from : state.tab;
-    const queue =
-      from === "today"
+    const continuing = state.tab === "practice";
+    if (continuing && !state.practice.saved) {
+      const form = document.querySelector("#attempt-form");
+      if (form)
+        state.practiceDrafts.set(keyOf(state.practice.q), {
+          html: form.innerHTML,
+          values: [...form.elements]
+            .filter((e) => e.name)
+            .map((e) => ({
+              name: e.name,
+              value: e.value,
+              checked: e.checked,
+              type: e.type,
+            })),
+          started: state.practice.started,
+        });
+    }
+    if (!continuing) state.practiceDrafts.clear();
+    const from = continuing ? state.practice.from : state.tab;
+    const queue = continuing
+      ? state.practice.queue
+      : from === "today"
         ? state.store.data.daily_sets
             .find((p) => p.day === jstDay())
             .items.map((i) => `${i.question_id}@${i.question_version}`)
@@ -364,7 +407,31 @@ function solve(key, old = null) {
       saved: false,
     };
     state.tab = "practice";
-    return render(true);
+    await render(true);
+    const draft = state.practiceDrafts.get(key);
+    if (draft) {
+      const form = document.querySelector("#attempt-form");
+      form.innerHTML = draft.html;
+      form.classList.toggle(
+        "is-grading",
+        !form.querySelector("#grading").hidden,
+      );
+      for (const entry of draft.values) {
+        const matches = [...form.elements].filter(
+          (e) => e.name === entry.name && e.type === entry.type,
+        );
+        for (const el of matches) {
+          if (el.type === "radio" || el.type === "checkbox") {
+            if (el.value === entry.value) el.checked = entry.checked;
+          } else el.value = entry.value;
+        }
+      }
+      state.practice.started = draft.started;
+    }
+    document
+      .querySelector(".practice-toolbar")
+      ?.scrollIntoView({ block: "start" });
+    return;
   }
   state.modal = { q, old, started: Date.now() };
   const dialog = modal(attemptForm(q, old));
@@ -381,7 +448,7 @@ function practiceScreen() {
   const p = state.practice;
   const pos = p.queue.indexOf(keyOf(p.q));
   const next = p.queue[pos + 1];
-  return `${head("問題を解く", `${p.from === "today" ? "今日の問題" : "教科別の演習"} ・ ${Math.max(1, pos + 1)} / ${Math.max(1, p.queue.length)}問`)}<div class="practice-toolbar"><button data-action="practice-back">一覧に戻る</button><small>回答 → 解答解説 → 自己採点 → 記録</small></div><section class="panel practice-sheet">${p.saved ? `<h2>結果を記録しました</h2><p class="prose">${esc(p.q.prompt)}</p><div class="answer-block"><h3>解答</h3><p class="prose">${esc(p.q.answer)}</p><h3>解答解説・考え方</h3><p class="prose">${esc(p.q.explanation || "解説は未登録です。")}</p></div><div class="actions">${next ? `<button class="primary" data-action="solve" data-key="${esc(next)}">次の問題へ</button>` : ""}<button data-action="solve" data-key="${esc(keyOf(p.q))}">この問題をもう一度</button><button data-action="memorize" data-key="${esc(keyOf(p.q))}">この問題を覚える</button><button data-action="practice-back">一覧へ戻る</button></div>` : attemptForm(p.q)}</section>`;
+  return `${head("問題を解く", `${p.from === "today" ? "今日の問題" : "教科別の演習"} ・ ${Math.max(1, pos + 1)} / ${Math.max(1, p.queue.length)}問`)}<div class="practice-toolbar"><button data-action="practice-back">一覧に戻る</button><small>番号で移動できます。途中の回答はこの演習中だけ保持します。</small></div><nav class="question-navigator" aria-label="問題番号">${p.queue.map((key, i) => `<button data-action="solve" data-key="${esc(key)}" ${key === keyOf(p.q) ? 'aria-current="step"' : ""}>${i + 1}${state.store.data.attempts.some((a) => `${a.question_id}@${a.question_version}` === key) ? " ✓" : ""}</button>`).join("")}</nav><section class="panel practice-sheet">${p.saved ? `<h2>結果を記録しました</h2><p class="prose">${esc(p.q.prompt)}</p><div class="answer-block"><h3>解答</h3><p class="prose">${esc(p.q.answer)}</p><h3>解答解説・考え方</h3><p class="prose">${esc(p.q.explanation || "解説は未登録です。")}</p></div><div class="actions">${next ? `<button class="primary" data-action="solve" data-key="${esc(next)}">次の問題へ</button>` : ""}<button data-action="solve" data-key="${esc(keyOf(p.q))}">この問題をもう一度</button><button data-action="memorize" data-key="${esc(keyOf(p.q))}">この問題を覚える</button><button data-action="practice-back">一覧へ戻る</button></div>` : attemptForm(p.q)}</section>`;
 }
 function download(value, filename) {
   const url = URL.createObjectURL(
@@ -402,7 +469,16 @@ document.addEventListener("click", async (event) => {
   try {
     state.busy = true;
     button.disabled = true;
-    if (action === "demo") await enter();
+    if (action === "authoring-brief") {
+      const url = URL.createObjectURL(
+        new Blob([authoringBrief], { type: "text/plain;charset=utf-8" }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "4Study-question-request.txt";
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } else if (action === "demo") await enter();
     else if (action === "tab") {
       state.tab = button.dataset.tab;
       state.historyId = "";
@@ -446,6 +522,9 @@ document.addEventListener("click", async (event) => {
       state.generation++;
       state.subject = "";
       state.unit = "";
+      state.source = "";
+      state.exactOnly = false;
+      state.practiceDrafts.clear();
       login();
     } else if (action === "solve") await solve(button.dataset.key);
     else if (action === "practice-back") {
@@ -461,18 +540,34 @@ document.addEventListener("click", async (event) => {
       state.kind = "";
       state.originalResult = "";
       state.onlyMarked = false;
+      state.source = q.source_id;
+      state.exactOnly = false;
+      state.memorySheet = `${q.source_id} / ${q.unit}`;
       state.tab = "memory";
       state.practice = null;
       await render(true);
       document
         .querySelector(`[data-memory-key="${CSS.escape(keyOf(q))}"]`)
         ?.scrollIntoView({ block: "start" });
+    } else if (action === "hide-answers") {
+      for (const flip of document.querySelectorAll(
+        '.sticky-answer[aria-expanded="true"]',
+      )) {
+        flip.setAttribute("aria-expanded", "false");
+        flip.setAttribute("aria-label", "答えを表示");
+        flip.querySelector(".sticky-cover").hidden = false;
+        flip.querySelector(".revealed-answer").hidden = true;
+        for (const mark of flip
+          .closest(".recall-line")
+          .querySelectorAll(".actions button"))
+          mark.disabled = true;
+      }
     } else if (action === "flip-blank") {
       const line = button.closest(".recall-line");
       const revealed = button.getAttribute("aria-expanded") !== "true";
       button.setAttribute("aria-expanded", String(revealed));
       button.setAttribute("aria-label", revealed ? "答えを隠す" : "答えを表示");
-      button.textContent = revealed ? "答えを隠す" : "答えを表示";
+      button.querySelector(".sticky-cover").hidden = revealed;
       line.querySelector(".revealed-answer").hidden = !revealed;
       for (const mark of line.querySelectorAll(".actions button")) {
         mark.disabled = !revealed;
@@ -539,6 +634,8 @@ document.addEventListener("click", async (event) => {
       }
       document.querySelector("#grading").hidden = false;
       button.hidden = true;
+      // Show the feedback as a new step, at the same screen position.
+      document.querySelector("#attempt-form").classList.add("is-grading");
       document.querySelector("[name=score]").focus();
     } else if (action === "sync") {
       await state.store.flush();
@@ -604,6 +701,16 @@ document.addEventListener("click", async (event) => {
 });
 document.addEventListener("change", async (event) => {
   const el = event.target;
+  if (["source", "memory-sheet", "exact-only"].includes(el.id)) {
+    if (el.id === "source") {
+      state.source = el.value;
+      state.memorySheet = "";
+    }
+    if (el.id === "memory-sheet") state.memorySheet = el.value;
+    if (el.id === "exact-only") state.exactOnly = el.checked;
+    await render();
+    return;
+  }
   if (el.id === "only-marked") {
     state.onlyMarked = el.checked;
     await render();
@@ -629,7 +736,11 @@ document.addEventListener("change", async (event) => {
   }
   if (["subject", "unit", "kind", "days"].includes(el.id)) {
     state[el.id] = el.id === "days" ? Number(el.value) : el.value;
-    if (el.id === "subject") state.unit = "";
+    if (el.id === "subject") {
+      state.unit = "";
+      state.source = "";
+      state.memorySheet = "";
+    }
     await render();
     document.getElementById(el.id)?.focus();
   }
@@ -721,7 +832,10 @@ document.addEventListener("submit", async (event) => {
         syncError = e.message;
       }
       if (old) form.closest("dialog").close();
-      else state.practice.saved = true;
+      else {
+        state.practice.saved = true;
+        state.practiceDrafts.delete(keyOf(q));
+      }
       await render(true);
       notice(syncError || "学習結果を記録しました。");
     }

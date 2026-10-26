@@ -960,3 +960,102 @@ h2 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Worksheet: keep each answer in its blank instead of adding text beside it. */
+.worksheet-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin: 16px 0;
+}
+.worksheet-toolbar label {
+  flex: 1;
+  min-width: 0;
+}
+.worksheet {
+  background: var(--surface, white);
+  border: 1px solid var(--border);
+  padding: 20px;
+  gap: 0;
+}
+.worksheet .memory-card {
+  padding: 12px 0;
+  border-bottom: 2px solid var(--border);
+}
+.worksheet .section-title {
+  margin-bottom: 4px;
+}
+.worksheet h2 {
+  font-size: 18px;
+}
+.worksheet .recall-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  padding: 8px 0;
+  align-items: center;
+}
+.worksheet .recall-line .prose {
+  margin: 0;
+}
+.worksheet .recall-line .actions {
+  gap: 6px;
+}
+.worksheet .recall-line .actions button {
+  font-size: 13px;
+  padding: 8px;
+  min-height: 44px;
+}
+.worksheet .recall-status:empty {
+  display: none;
+}
+.worksheet .recall-status {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+.sticky-answer {
+  min-width: 9em;
+  min-height: 44px;
+  vertical-align: middle;
+  max-width: 100%;
+  white-space: normal;
+}
+.question-navigator {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 12px 0;
+}
+.question-navigator button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.question-navigator [aria-current] {
+  background: var(--primary);
+  color: white;
+}
+.practice-toolbar {
+  scroll-margin-top: 12px;
+}
+#attempt-form.is-grading > label,
+#attempt-form.is-grading > fieldset {
+  display: none;
+}
+#attempt-form.is-grading #grading {
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 800px) {
+  .worksheet {
+    padding: 12px;
+  }
+  .worksheet .recall-line {
+    grid-template-columns: 1fr;
+  }
+  .worksheet .recall-line .actions {
+    flex-wrap: wrap;
+  }
+  .worksheet .recall-count {
+    font-size: 12px;
+  }
+}

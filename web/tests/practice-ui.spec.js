@@ -120,3 +120,59 @@ for (const width of [1440, 390]) {
     expect(errors).toEqual([]);
   });
 }
+
+for (const width of [1440, 390]) {
+  test(`question navigation retains drafts and worksheet switches at ${width}`, async ({
+    page,
+  }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+    await page.getByRole("button", { name: "サンプルで試す" }).click();
+    await page
+      .getByRole("button", { name: "教科別の演習", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "このセットを解く", exact: true })
+      .click();
+    const nav = page.getByRole("navigation", { name: "問題番号" });
+    await page.getByLabel("自分の回答・途中式").fill("途中式を保持");
+    await nav.getByRole("button").nth(1).click();
+    await nav.getByRole("button").nth(0).click();
+    await expect(page.getByLabel("自分の回答・途中式")).toHaveValue(
+      "途中式を保持",
+    );
+    await page.getByRole("button", { name: "解答・解説を確認する" }).click();
+    await page.getByLabel("獲得点").fill("2");
+    await nav.getByRole("button").nth(1).click();
+    await nav.getByRole("button").nth(0).click();
+    await expect(page.getByLabel("獲得点")).toHaveValue("2");
+    await expect(page.locator("#grading")).toBeVisible();
+    await page.getByRole("button", { name: "結果を記録する" }).click();
+    await page.getByRole("button", { name: "この問題をもう一度" }).click();
+    await expect(page.getByLabel("自分の回答・途中式")).toHaveValue("");
+    await page
+      .getByRole("button", { name: "覚える", exact: true })
+      .first()
+      .click();
+    await page.locator("#subject").selectOption("論理表現");
+    await expect(page.locator(".recall-line")).toHaveCount(2);
+    await page.locator(".sticky-answer").first().click();
+    await expect(
+      page.locator(".sticky-answer .revealed-answer").first(),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "すべて隠す" }).click();
+    await expect(page.locator(".revealed-answer").first()).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: "間違えた ＋1" }).first(),
+    ).toBeDisabled();
+    await page.screenshot({
+      path: testInfo.outputPath(`worksheet-${width}.png`),
+      fullPage: true,
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth > innerWidth,
+      ),
+    ).toBe(false);
+  });
+}

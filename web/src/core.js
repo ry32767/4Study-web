@@ -184,6 +184,18 @@ export function validateQuestions(input) {
     const blanks = q.blanks ?? [];
     const original_result = q.original_result ?? "unknown";
     const source_question = q.source_question ?? "";
+    const source_fidelity = q.source_fidelity ?? "unverified";
+    if (
+      !["exact", "adapted", "unverified"].includes(source_fidelity) ||
+      (source_fidelity === "exact" &&
+        (q.kind !== "review" ||
+          !q.source_id.trim() ||
+          !source_question.trim() ||
+          !q.source_page.trim()))
+    )
+      throw new Error(
+        "原文照合済み問題には原本ID・ページ・問題番号と復習種別が必要です。",
+      );
     if (
       !Array.isArray(choices) ||
       ![0, 4].includes(choices.length) ||
@@ -242,6 +254,7 @@ export function validateQuestions(input) {
             })),
             original_result,
             source_question,
+            source_fidelity,
           }),
         ),
     );

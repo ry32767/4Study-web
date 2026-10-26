@@ -66,3 +66,32 @@ test("old question JSON defaults and malformed choices/blanks are validated", ()
     assert.throws(() => validateQuestions([{ ...q, ...extra }]));
   assert.equal(validateQuestions(samples)[4].choices.length, 4);
 });
+
+test("exact copies require provenance and stay separate from adapted questions", () => {
+  const q = {
+    ...samples[0],
+    source_question: "1(1)",
+    source_page: "1",
+    source_fidelity: "exact",
+  };
+  assert.equal(validateQuestions([q])[0].source_fidelity, "exact");
+  for (const extra of [
+    { source_page: "" },
+    { source_question: "" },
+    { source_id: "" },
+    { kind: "variant" },
+    { source_fidelity: "guess" },
+  ])
+    assert.throws(() => validateQuestions([{ ...q, ...extra }]));
+  assert.equal(
+    questionList(
+      { questions: [q, { ...q, id: "adapted", source_fidelity: "adapted" }] },
+      { exactOnly: true },
+    ).length,
+    1,
+  );
+  assert.equal(
+    questionList({ questions: [q] }, { source: "missing" }).length,
+    0,
+  );
+});
